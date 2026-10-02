@@ -1,98 +1,46 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { View } from 'react-native';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
+import { Eyebrow, GameButton, GamePage, Headline, MiniBoard, SaveNotice } from '@/components/game-ui';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
+export default function CatalogScreen() {
+  const theme = useTheme();
+  return <GamePage>
+    <View style={{ gap: 14, paddingTop: 12, paddingBottom: 8 }}>
+      <Eyebrow>A pocketful of play</Eyebrow>
+      <Headline>{'A little play,\nevery day.'}</Headline>
+      <ThemedText themeColor="textSecondary" style={{ maxWidth: 300, fontWeight: '400' }}>Good games. Familiar faces. A moment just for you.</ThemedText>
+    </View>
+    <SaveNotice />
+    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+      <Eyebrow>Your game shelf</Eyebrow>
+      <ThemedText type="small" themeColor="textSecondary">01 game</ThemedText>
+    </View>
+    <View style={{ borderRadius: 28, borderCurve: 'continuous', borderWidth: 1, borderColor: theme.border, backgroundColor: theme.backgroundElement, overflow: 'hidden' }}>
+      <View style={{ backgroundColor: theme.backgroundSelected, minHeight: 210, padding: 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ gap: 8, flex: 1 }}>
+          <ThemedText type="smallBold" themeColor="primary" style={{ letterSpacing: 2 }}>NO. 001</ThemedText>
+          <ThemedText themeColor="primary" style={{ fontSize: 55, lineHeight: 64, fontWeight: '400' }}>1 2 3</ThemedText>
+          <ThemedText themeColor="primary" type="small" style={{ fontWeight: '400' }}>Nine numbers. Endless possibility.</ThemedText>
+        </View>
+        <MiniBoard compact />
+      </View>
+      <View style={{ padding: 24, gap: 16 }}>
+        <View style={{ gap: 8 }}>
+          <ThemedText style={{ fontSize: 30, fontWeight: '600' }}>Sudoku</ThemedText>
+          <ThemedText themeColor="textSecondary" style={{ fontWeight: '400' }}>A fresh daily puzzle or a trail of challenges. Find your own rhythm.</ThemedText>
+        </View>
+        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+          {['Logic', 'Daily puzzles', 'Adventure'].map(label => <View key={label} style={{ backgroundColor: theme.background, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 5 }}><ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 12 }}>{label}</ThemedText></View>)}
+        </View>
+        <GameButton label="Play Sudoku  →" onPress={() => router.push('/sudoku')} />
+      </View>
+    </View>
+    <View style={{ alignItems: 'center', gap: 6, paddingVertical: 16 }}>
+      <ThemedText type="smallBold" themeColor="primary">Your games go wherever you go.</ThemedText>
+      <ThemedText type="small" themeColor="textSecondary" style={{ fontWeight: '400' }}>Always available offline. Progress saved here.</ThemedText>
+    </View>
+  </GamePage>;
 }
-
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
-});

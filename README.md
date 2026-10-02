@@ -1,56 +1,31 @@
-# Welcome to your Expo app 👋
+# Beacon Games
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+A small, offline-first game catalog built with Expo SDK 57 and Expo Router. Sudoku is the first game, with a shared daily puzzle and 24 adventure levels that unlock in order.
 
-## Get started
+Puzzles and solutions ship with the app. The daily puzzle uses the device's calendar date, so friends on the same date get the same board without a server. Adventure difficulty increases by measured solving effort; the four chapters run from beginner to hard.
 
-1. Install dependencies
+Progress, pencil notes, time, hints, and completed levels are saved locally with AsyncStorage. Buttons and sheets use native `@expo/ui` components; the Sudoku grid uses React Native pressable cells. There are no accounts or online services.
 
-   ```bash
-   npm install
-   ```
+## Run locally
 
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```sh
+bun install
+bunx expo start --go
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Open in an SDK 57-compatible Expo Go, or press `a` for a running Android emulator. For web, use `bun run web`.
 
-### Other setup steps
+An existing development build needs rebuilding after the AsyncStorage dependency was added. Configure a development profile with EAS before building a custom client. A packaged build includes the JavaScript and puzzles for offline play; Expo Go still uses Metro while developing.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+## Validate
 
-## Learn more
+```sh
+bunx expo lint
+bunx tsc --noEmit
+bun scripts/build-sudoku.ts
+bunx expo export --platform web
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+The puzzle script verifies unique solutions, increasing adventure scores, and repeatable daily boards. Run it with `--generate` only when intentionally replacing the bundled puzzle pack; changing that pack also requires a new save-data version.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+Routes live in `src/app/`, game components in `src/components/`, persistence in `src/hooks/use-games.tsx`, and puzzle rules in `src/utils/sudoku.ts`.
