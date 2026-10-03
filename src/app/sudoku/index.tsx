@@ -5,11 +5,13 @@ import { Pressable, View } from 'react-native';
 import { Eyebrow, GameButton, GamePage, Headline, MiniBoard, SaveNotice } from '@/components/game-ui';
 import { ThemedText } from '@/components/themed-text';
 import { useGames } from '@/hooks/use-games';
+import { useInteractionSound } from '@/hooks/use-interaction-sound';
 import { useTheme } from '@/hooks/use-theme';
 import { chapterFor, DAILY_DIFFICULTIES, dailyId, formatTime, getPuzzle, LEVEL_COUNT, levelId, localDate, type DailyDifficulty } from '@/utils/sudoku';
 
 export default function SudokuScreen() {
   const theme = useTheme();
+  const playSound = useInteractionSound();
   const { sessions, unlocked } = useGames();
   const [today, setToday] = useState(localDate);
   const [difficulty, setDifficulty] = useState<DailyDifficulty>('Easy');
@@ -40,7 +42,7 @@ export default function SudokuScreen() {
         <MiniBoard compact />
       </View>
       <View accessibilityRole="radiogroup" accessibilityLabel="Daily puzzle difficulty" style={{ flexDirection: 'row', gap: 8 }}>
-        {DAILY_DIFFICULTIES.map(option => <Pressable key={option} onPress={() => setDifficulty(option)} accessibilityRole="radio"
+        {DAILY_DIFFICULTIES.map(option => <Pressable key={option} onPress={() => { playSound(); setDifficulty(option); }} accessibilityRole="radio"
           accessibilityLabel={option} accessibilityState={{ checked: difficulty === option }} testID={`daily-${option.toLowerCase()}`}
           style={({ pressed }) => ({ flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: difficulty === option ? theme.primary : theme.backgroundSelected, opacity: pressed ? 0.75 : 1 })}>
           <ThemedText type="smallBold" style={{ color: difficulty === option ? theme.primaryText : theme.primary }}>{option}</ThemedText>

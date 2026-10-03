@@ -4,12 +4,13 @@ import { ActivityIndicator, View } from 'react-native';
 
 import { GameButton } from '@/components/game-ui';
 import { ThemedText } from '@/components/themed-text';
-import { GamesProvider, useGames } from '@/hooks/use-games';
+import { GamesProvider, useGamesStatus } from '@/hooks/use-games';
+import { InteractionSoundProvider } from '@/hooks/use-interaction-sound';
 import { useTheme } from '@/hooks/use-theme';
 
 function Navigation() {
   const theme = useTheme();
-  const { ready, error, retry } = useGames();
+  const { ready, error, retry } = useGamesStatus();
   if (!ready) return <View style={{ flex: 1, justifyContent: 'center', padding: 32, gap: 16, backgroundColor: theme.background }}>
     {error ? <><ThemedText accessibilityRole="alert">{error}</ThemedText><GameButton label="Retry" onPress={retry} /></> : <ActivityIndicator color={theme.primary} accessibilityLabel="Loading your saved games" />}
   </View>;
@@ -25,5 +26,5 @@ function Navigation() {
 }
 
 export default function RootLayout() {
-  return <GamesProvider><Navigation /></GamesProvider>;
+  return <InteractionSoundProvider><GamesProvider><Navigation /></GamesProvider></InteractionSoundProvider>;
 }

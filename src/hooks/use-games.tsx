@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createContext, use, useCallback, useEffect, useRef, useState, type PropsWithChildren } from 'react';
+import { createContext, use, useCallback, useEffect, useMemo, useRef, useState, type PropsWithChildren } from 'react';
 
 import { getPuzzle, LEVEL_COUNT, levelId, type Puzzle } from '@/utils/sudoku';
 
@@ -55,8 +55,8 @@ function unlockedLevel(sessions: Sessions) {
   return level;
 }
 
+const SessionsContext = createContext<Sessions | null>(null);
 const GamesContext = createContext<{
-  sessions: Sessions;
   ready: boolean;
   error: string | null;
   unlocked: number;
@@ -104,13 +104,23 @@ export function GamesProvider({ children }: PropsWithChildren) {
     persist(snapshot);
   }, [persist]);
 
-  const retry = () => { if (ready) persist(latest.current); else void load(); };
+  const retry = useCallback(() => { if (ready) persist(latest.current); else void load(); }, [ready, persist, load]);
+  const unlocked = unlockedLevel(sessions);
+  // Progress changes should not refresh navigation or save notices.
+  const status = useMemo(() => ({ ready, error, unlocked, save, retry }), [ready, error, unlocked, save, retry]);
 
-  return <GamesContext value={{ sessions, ready, error, unlocked: unlockedLevel(sessions), save, retry }}>{children}</GamesContext>;
+  return <GamesContext value={status}><SessionsContext value={sessions}>{children}</SessionsContext></GamesContext>;
+}
+
+export function useGamesStatus() {
+  const context = use(GamesContext);
+  if (!context) throw new Error('useGamesStatus must be inside GamesProvider');
+  return context;
 }
 
 export function useGames() {
-  const context = use(GamesContext);
-  if (!context) throw new Error('useGames must be inside GamesProvider');
-  return context;
+  const status = useGamesStatus();
+  const sessions = use(SessionsContext);
+  if (!sessions) throw new Error('useGames must be inside GamesProvider');
+  return { ...status, sessions };
 }

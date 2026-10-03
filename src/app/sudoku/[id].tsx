@@ -3,12 +3,12 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { GameButton, GamePage } from '@/components/game-ui';
 import { SudokuGame } from '@/components/sudoku-game';
 import { ThemedText } from '@/components/themed-text';
-import { useGames } from '@/hooks/use-games';
+import { useGamesStatus } from '@/hooks/use-games';
 import { getPuzzle } from '@/utils/sudoku';
 
 export default function PuzzleScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { unlocked } = useGames();
+  const { unlocked } = useGamesStatus();
   const puzzle = typeof id === 'string' ? getPuzzle(id) : null;
   if (!puzzle || (puzzle.mode === 'adventure' && puzzle.level > unlocked)) return <GamePage>
     <ThemedText type="subtitle">{puzzle ? 'One step at a time.' : 'Puzzle not found.'}</ThemedText>

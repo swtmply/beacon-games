@@ -5,18 +5,20 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
 import { Fonts } from '@/constants/theme';
-import { useGames } from '@/hooks/use-games';
+import { useGamesStatus } from '@/hooks/use-games';
+import { useInteractionSound } from '@/hooks/use-interaction-sound';
 import { useTheme } from '@/hooks/use-theme';
 
 export function NativeButton({ label, onPress, disabled, variant = 'text', testID, height = 48, fontSize = 16, color, backgroundColor }: Pick<ComponentProps<typeof Button>, 'onPress' | 'disabled' | 'variant' | 'testID'> & {
   label: string; height?: number; fontSize?: number; color?: string; backgroundColor?: string;
 }) {
   const theme = useTheme();
+  const playSound = useInteractionSound();
   const [width, setWidth] = useState(0);
   return (
     <Host matchContents={{ vertical: true }} style={{ width: '100%', height }} seedColor={theme.primary}
       onLayout={event => setWidth(Math.floor(event.nativeEvent.layout.width))}>
-      <Button onPress={onPress} disabled={disabled} variant={variant} testID={testID}
+      <Button onPress={() => { if (disabled || !onPress) return; playSound(); onPress(); }} disabled={disabled} variant={variant} testID={testID}
         style={{ width: width || undefined, height, borderRadius: 14, backgroundColor, borderColor: theme.border }}>
         <NativeText textStyle={{ color: color ?? theme.primary, fontSize, fontWeight: '600' }}>{label}</NativeText>
       </Button>
@@ -51,7 +53,7 @@ export function Headline({ children }: { children: string }) {
 }
 
 export function SaveNotice() {
-  const { error, retry } = useGames();
+  const { error, retry } = useGamesStatus();
   const theme = useTheme();
   if (!error) return null;
   return <View style={{ padding: 16, backgroundColor: theme.errorSoft, borderRadius: 16, gap: 10 }}>
