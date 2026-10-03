@@ -1,6 +1,8 @@
 import puzzlePack from '@/data/sudoku.json';
 
 export const DIGITS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+export type DailyDifficulty = 'Easy' | 'Medium' | 'Hard';
+export const DAILY_DIFFICULTIES: DailyDifficulty[] = ['Easy', 'Medium', 'Hard'];
 export const LEVEL_COUNT = puzzlePack.length;
 export const CHAPTERS = [
   { name: 'First light', description: 'Find your footing.', difficulty: 'Beginner' },
@@ -28,8 +30,8 @@ export function localDate(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-export function dailyId(date = localDate()) {
-  return `daily-${date}`;
+export function dailyId(date = localDate(), difficulty?: DailyDifficulty) {
+  return `daily-${date}${difficulty ? `-${difficulty.toLowerCase()}` : ''}`;
 }
 
 export function levelId(level: number) {
@@ -71,13 +73,17 @@ export function getPuzzle(id: string): Puzzle | null {
     };
   }
 
-  const dateMatch = /^daily-(\d{4}-\d{2}-\d{2})$/.exec(id);
+  const dateMatch = /^daily-(\d{4}-\d{2}-\d{2})(?:-(easy|medium|hard))?$/.exec(id);
   if (!dateMatch) return null;
   const date = dateMatch[1];
+  const difficulty = dateMatch[2];
   const parsed = new Date(`${date}T12:00:00`);
   if (!Number.isFinite(parsed.getTime()) || localDate(parsed) !== date) return null;
-  const random = seededRandom([...date].reduce((seed, char) => Math.imul(seed, 31) + char.charCodeAt(0) | 0, 0));
-  const level = 7 + Math.floor(random() * 12);
+  const seed = difficulty ? `${date}-${difficulty}` : date;
+  const random = seededRandom([...seed].reduce((seed, char) => Math.imul(seed, 31) + char.charCodeAt(0) | 0, 0));
+  const level = difficulty
+    ? (difficulty === 'easy' ? 7 : difficulty === 'medium' ? 13 : 19) + Math.floor(random() * 6)
+    : 7 + Math.floor(random() * 12);
   const entry = puzzlePack[level - 1];
   const digits = shuffle(DIGITS, random);
   const order = () => shuffle([0, 1, 2], random).flatMap(group => shuffle([0, 1, 2], random).map(offset => group * 3 + offset));

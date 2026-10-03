@@ -2,7 +2,7 @@ import { BottomSheet, Host } from '@expo/ui';
 import { router, useFocusEffect } from 'expo-router';
 import { Stack } from 'expo-router/stack';
 import { useCallback, useRef, useState } from 'react';
-import { AppState, ScrollView, useWindowDimensions, View } from 'react-native';
+import { AppState, Pressable, ScrollView, Switch, useWindowDimensions, View } from 'react-native';
 
 import { Eyebrow, GameButton, GamePage, NativeButton, SaveNotice } from '@/components/game-ui';
 import { SudokuBoard } from '@/components/sudoku-board';
@@ -12,33 +12,30 @@ import { newSession, useGames, type Session } from '@/hooks/use-games';
 import { useTheme } from '@/hooks/use-theme';
 import { arePeers, chapterFor, DIGITS, formatTime, LEVEL_COUNT, levelId, type Puzzle } from '@/utils/sudoku';
 
-type Move = Pick<Session, 'values' | 'notes'>;
-
 export function SudokuGame({ puzzle }: { puzzle: Puzzle }) {
   const theme = useTheme();
-  const { height } = useWindowDimensions();
+  const { height, width } = useWindowDimensions();
   const { sessions, save } = useGames();
   const [session, setSession] = useState(() => sessions[puzzle.id] ?? newSession(puzzle));
   const current = useRef(session);
   const [selected, setSelected] = useState(() => Math.max(0, puzzle.givens.indexOf(0)));
-  const selection = useRef(selected);
+  const [selectedDigit, setSelectedDigit] = useState<number | null>(null);
   const [pencil, setPencil] = useState(false);
-  const pencilMode = useRef(false);
-  const [history, setHistory] = useState<Move[]>([]);
-  const [sheet, setSheet] = useState<'help' | 'pause' | 'complete' | null>(null);
-  const [message, setMessage] = useState(session.completed ? 'Every number in its place. Beautifully done.' : 'Tap a cell, then choose a number.');
+  const [sheet, setSheet] = useState<'pause' | 'complete' | null>(null);
   const paused = sheet !== null;
+  const numberSize = Math.min(58, (width - 40 - 32) / 5);
 
   function select(index: number) {
-    selection.current = index;
+    if (paused) return;
+    clearMistakes();
     setSelected(index);
+    if (selectedDigit !== null) enter(index, selectedDigit);
   }
 
-  function togglePencil() {
-    const next = !pencilMode.current;
-    pencilMode.current = next;
-    setPencil(next);
-    setMessage(next ? 'Pencil mode. Add your possibilities.' : 'Number mode. Choose your answer.');
+  function selectDigit(digit: number) {
+    if (paused || current.current.completed) return;
+    clearMistakes();
+    setSelectedDigit(digit);
   }
 
   const update = useCallback((next: Session, persist = true) => {
@@ -55,69 +52,52 @@ export function SudokuGame({ puzzle }: { puzzle: Puzzle }) {
       update(next, next.elapsed % 10 === 0);
     }, 1000);
     const listener = AppState.addEventListener('change', state => {
-      if (state !== 'active') save(puzzle.id, current.current);
+      if (state !== 'active') {
+        save(puzzle.id, current.current);
+        if (!current.current.completed) setSheet('pause');
+      }
     });
     return () => { clearInterval(timer); listener.remove(); save(puzzle.id, current.current); };
   }, [paused, puzzle.id, save, update]));
 
   function commit(values: number[], notes: number[][], extra: Partial<Pick<Session, 'mistakes' | 'hints'>> = {}) {
     const previous = current.current;
-    setHistory(moves => [...moves.slice(-29), { values: previous.values, notes: previous.notes }]);
     const completed = values.every((value, index) => value === puzzle.solution[index]);
     update({ ...previous, values, notes, ...extra, completed });
-    if (completed) { setMessage('Every number in its place. Beautifully done.'); setSheet('complete'); }
+    if (completed) setSheet('complete');
   }
 
-  function enter(digit: number) {
+  function clearMistakes() {
     const previous = current.current;
-    const selected = selection.current;
-    if (previous.completed) return;
-    if (puzzle.givens[selected]) { setMessage('This number is a clue. Choose an empty cell.'); return; }
-    if (pencilMode.current) {
-      if (previous.values[selected]) { setMessage('Erase the number first to add pencil notes.'); return; }
+    const values = previous.values.map((value, index) => value && value !== puzzle.solution[index] ? 0 : value);
+    if (values.some((value, index) => value !== previous.values[index])) update({ ...previous, values });
+  }
+
+  function enter(selected: number, digit: number) {
+    const previous = current.current;
+    if (previous.completed || puzzle.givens[selected] || previous.values[selected] === puzzle.solution[selected]) return;
+    if (pencil) {
       const notes = previous.notes.map((cell, index) => index !== selected ? cell : cell.includes(digit) ? cell.filter(value => value !== digit) : [...cell, digit].sort());
       commit(previous.values, notes);
-      setMessage('Pencil notes are possibilities, not answers.');
       return;
     }
-    if (previous.values[selected] === digit) return;
     const wrong = digit !== puzzle.solution[selected];
     const values = previous.values.map((value, index) => index === selected ? digit : value);
-    const notes = previous.notes.map((cell, index) => index === selected ? [] : !wrong && arePeers(selected, index) ? cell.filter(value => value !== digit) : cell);
-    setMessage(wrong ? 'That number is not quite right. Try another.' : 'Nice. Keep following the clues.');
+    const notes = previous.notes.map((cell, index) => index === selected ? wrong ? cell : [] : !wrong && arePeers(selected, index) ? cell.filter(value => value !== digit) : cell);
     commit(values, notes, { mistakes: previous.mistakes + Number(wrong) });
   }
 
-  function erase() {
-    const previous = current.current;
-    const selected = selection.current;
-    if (previous.completed || puzzle.givens[selected]) return;
-    if (!previous.values[selected] && !previous.notes[selected].length) return;
-    commit(previous.values.map((value, index) => index === selected ? 0 : value), previous.notes.map((cell, index) => index === selected ? [] : cell));
-    setMessage('A clean slate for this cell.');
-  }
-
-  function undo() {
-    if (!history.length || current.current.completed) return;
-    const move = history[history.length - 1];
-    update({ ...current.current, ...move });
-    setHistory(moves => moves.slice(0, -1));
-    setMessage('Last move undone.');
-  }
-
   function hint() {
+    if (paused || current.current.completed) return;
+    clearMistakes();
     const previous = current.current;
-    const selected = selection.current;
-    if (previous.completed) return;
     const index = !puzzle.givens[selected] && previous.values[selected] !== puzzle.solution[selected] ? selected : previous.values.findIndex((value, i) => value !== puzzle.solution[i]);
     if (index < 0) return;
     const digit = puzzle.solution[index];
     const values = previous.values.map((value, i) => i === index ? digit : value);
     const notes = previous.notes.map((cell, i) => i === index ? [] : arePeers(index, i) ? cell.filter(value => value !== digit) : cell);
-    select(index);
-    pencilMode.current = false;
+    setSelected(index);
     setPencil(false);
-    setMessage(`A little help: row ${Math.floor(index / 9) + 1}, column ${index % 9 + 1} is ${digit}.`);
     commit(values, notes, { hints: previous.hints + 1 });
   }
 
@@ -125,12 +105,6 @@ export function SudokuGame({ puzzle }: { puzzle: Puzzle }) {
   const filled = session.values.filter((value, i) => !puzzle.givens[i] && value === puzzle.solution[i]).length;
   const emptyCount = puzzle.givens.filter(value => !value).length;
   const subtitle = puzzle.mode === 'daily' ? new Date(`${puzzle.date}T12:00:00`).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : chapterFor(puzzle.level).name;
-  const tools = [
-    { label: 'Undo', disabled: !history.length || session.completed },
-    { label: 'Erase', disabled: Boolean(puzzle.givens[selected]) || session.completed },
-    { label: pencil ? 'Notes on' : 'Notes', disabled: session.completed },
-    { label: 'Hint', disabled: session.completed },
-  ];
 
   return <>
     <Stack.Screen options={{ title }} />
@@ -147,44 +121,38 @@ export function SudokuGame({ puzzle }: { puzzle: Puzzle }) {
         </View>
       </View>
       <View style={{ position: 'relative' }}>
-        <SudokuBoard puzzle={puzzle} values={session.values} notes={session.notes} selected={selected} onSelect={select} completed={session.completed} />
+        <SudokuBoard puzzle={puzzle} values={session.values} notes={session.notes} selected={selected} selectedDigit={selectedDigit} onSelect={select} completed={session.completed} />
         {sheet === 'pause' ? <View style={{ position: 'absolute', inset: 0, backgroundColor: theme.backgroundSelected, borderRadius: 10, alignItems: 'center', justifyContent: 'center' }}><ThemedText style={{ fontFamily: Fonts.serif, fontSize: 32 }}>Take a breather.</ThemedText></View> : null}
       </View>
-      <ThemedText accessibilityLiveRegion="polite" type="small" themeColor="textSecondary" style={{ textAlign: 'center', minHeight: 36, fontWeight: '400' }}>{message}</ThemedText>
-      <View style={{ flexDirection: 'row', gap: 6 }}>
-        {tools.map((tool, index) => <View key={index} style={{ flex: 1 }}>
-            <NativeButton label={tool.label} fontSize={12} disabled={tool.disabled} onPress={() => {
-              if (index === 0) undo();
-              else if (index === 1) erase();
-              else if (index === 3) hint();
-              else togglePencil();
-            }} color={tool.disabled ? theme.textSecondary : theme.primary} backgroundColor={tool.label === 'Notes on' ? theme.backgroundSelected : theme.backgroundElement} />
+      <View style={{ gap: 10 }}>
+        {[DIGITS.slice(0, 5), DIGITS.slice(5)].map((row, index) => <View key={index} style={{ flexDirection: 'row', justifyContent: 'center', gap: 8 }}>
+          {row.map(digit => <Pressable key={digit} disabled={paused || session.completed} onPress={() => selectDigit(digit)} testID={`digit-${digit}`}
+            accessibilityRole="button" accessibilityLabel={`Number ${digit}`} accessibilityHint={pencil ? 'Select this note, then tap a cell to add or remove it' : 'Select this number, then tap a cell to place it'}
+            accessibilityState={{ selected: selectedDigit === digit, disabled: paused || session.completed }}
+            style={({ pressed }) => ({ width: numberSize, height: numberSize, borderRadius: selectedDigit === digit ? numberSize * 0.28 : numberSize / 2, borderCurve: selectedDigit === digit ? 'continuous' : 'circular', alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderStyle: pencil ? 'dashed' : 'solid', borderColor: pencil ? theme.primary : 'transparent', backgroundColor: selectedDigit === digit ? pencil ? theme.backgroundSelected : theme.primary : pencil ? theme.backgroundElement : theme.backgroundSelected, opacity: session.completed ? 0.5 : pressed ? 0.75 : 1 })}>
+            <ThemedText maxFontSizeMultiplier={1.25} style={{ fontSize: 23, lineHeight: 28, fontWeight: '600', color: selectedDigit === digit && !pencil ? theme.primaryText : theme.primary }}>{String(digit)}</ThemedText>
+          </Pressable>)}
         </View>)}
       </View>
-      <View style={{ flexDirection: 'row', gap: 4 }}>
-        {DIGITS.map(digit => {
-          const remaining = Math.max(0, 9 - session.values.filter((value, index) => value === digit && value === puzzle.solution[index]).length);
-          return <View key={digit} style={{ flex: 1, gap: 2, alignItems: 'center' }}>
-            <NativeButton label={String(digit)} height={58} fontSize={23} disabled={session.completed || remaining === 0} onPress={() => enter(digit)} testID={`digit-${digit}`} color={remaining ? theme.primary : theme.textSecondary} backgroundColor={theme.backgroundSelected} />
-            <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 10 }}>{String(remaining)}</ThemedText>
-          </View>;
-        })}
+      <View style={{ alignItems: 'center', gap: 2 }}>
+        <ThemedText type="smallBold" themeColor="primary">Notes</ThemedText>
+        <View style={{ width: 76, height: 56, alignItems: 'center', justifyContent: 'center' }}>
+          <Switch value={pencil} onValueChange={setPencil} disabled={paused || session.completed} accessibilityLabel="Notes mode" testID="notes-toggle"
+            style={{ transform: [{ scale: 1.4 }] }} trackColor={{ false: theme.border, true: theme.primary }} ios_backgroundColor={theme.border} />
+        </View>
+        <View style={{ position: 'absolute', right: 0, bottom: 4, width: '30%', maxWidth: 110 }}><NativeButton label="Hint" fontSize={12} disabled={paused || session.completed} onPress={hint} backgroundColor={theme.backgroundElement} /></View>
       </View>
-      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-        <ThemedText type="small" themeColor="textSecondary" style={{ fontSize: 12 }}>{session.mistakes} mistakes · {session.hints} hints</ThemedText>
-        <View style={{ width: 110 }}><NativeButton fontSize={12} label="Rules" onPress={() => setSheet('help')} /></View>
-      </View>
-      {session.completed ? <GameButton label="Puzzle complete  ✓" onPress={() => setSheet('complete')} /> : <GameButton secondary label="Pause game" onPress={() => setSheet('pause')} />}
+      {session.completed ? <GameButton label="Puzzle complete  ✓" onPress={() => setSheet('complete')} /> : null}
     </GamePage>
     <Host>
       <BottomSheet isPresented={sheet !== null} onDismiss={() => setSheet(null)} containerColor={theme.background} contentPadding={0} snapPoints={['full']}>
         <ScrollView style={{ width: '100%', height: Math.round(height * 0.85) }} contentContainerStyle={{ gap: 20, padding: 24, paddingBottom: 48 }}>
-          <Eyebrow>{sheet === 'complete' ? 'A little victory' : sheet === 'pause' ? 'No rush' : 'The rules are simple'}</Eyebrow>
-          <ThemedText style={{ fontFamily: Fonts.serif, fontSize: 34, lineHeight: 40, fontWeight: '400' }}>{sheet === 'complete' ? 'Everything in its place.' : sheet === 'pause' ? 'Take a breather.' : 'Nine numbers. One rule.'}</ThemedText>
-          <ThemedText themeColor="textSecondary" style={{ fontWeight: '400' }}>{sheet === 'complete' ? `You solved ${title.toLowerCase()} in ${formatTime(session.elapsed)}, with ${session.mistakes} mistakes and ${session.hints} hints.` : sheet === 'pause' ? 'Your timer is paused. Pick up where you left off when you’re ready.' : 'Fill each row, column, and 3 × 3 box with the numbers 1–9, using each number once. The darker numbers are clues and stay in place. Tap a cell, then a number. Use Notes for possibilities, Undo to retrace a move, or Hint for a little help.'}</ThemedText>
+          <Eyebrow>{sheet === 'complete' ? 'A little victory' : 'No rush'}</Eyebrow>
+          <ThemedText style={{ fontFamily: Fonts.serif, fontSize: 34, lineHeight: 40, fontWeight: '400' }}>{sheet === 'complete' ? 'Everything in its place.' : 'Take a breather.'}</ThemedText>
+          <ThemedText themeColor="textSecondary" style={{ fontWeight: '400' }}>{sheet === 'complete' ? `You solved ${title.toLowerCase()} in ${formatTime(session.elapsed)}, with ${session.hints} hints.` : 'Your timer is paused. Pick up where you left off when you’re ready.'}</ThemedText>
           {sheet === 'complete' && puzzle.mode === 'adventure' && puzzle.level < LEVEL_COUNT ? <GameButton label={`On to level ${puzzle.level + 1}  →`} onPress={() => { setSheet(null); router.replace({ pathname: '/sudoku/[id]', params: { id: levelId(puzzle.level + 1) } }); }} /> : null}
           {sheet === 'complete' && puzzle.mode === 'adventure' && puzzle.level === LEVEL_COUNT ? <ThemedText themeColor="primary">You’ve reached the summit. All 24 levels complete.</ThemedText> : null}
-          <GameButton label={sheet === 'pause' ? 'Keep playing' : sheet === 'help' ? 'Got it. Let’s play.' : 'View my puzzle'} onPress={() => setSheet(null)} secondary={sheet === 'complete'} />
+          <GameButton label={sheet === 'pause' ? 'Keep playing' : 'View my puzzle'} onPress={() => setSheet(null)} secondary={sheet === 'complete'} />
           {sheet === 'complete' ? <GameButton secondary label={puzzle.mode === 'adventure' ? 'Back to the trail' : 'Back to Sudoku'} onPress={() => { setSheet(null); router.replace(puzzle.mode === 'adventure' ? '/sudoku/adventure' : '/sudoku'); }} /> : null}
         </ScrollView>
       </BottomSheet>

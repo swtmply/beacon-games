@@ -1,20 +1,22 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Eyebrow, GameButton, GamePage, Headline, MiniBoard, SaveNotice } from '@/components/game-ui';
 import { ThemedText } from '@/components/themed-text';
 import { useGames } from '@/hooks/use-games';
 import { useTheme } from '@/hooks/use-theme';
-import { chapterFor, dailyId, formatTime, getPuzzle, LEVEL_COUNT, levelId, localDate } from '@/utils/sudoku';
+import { chapterFor, DAILY_DIFFICULTIES, dailyId, formatTime, getPuzzle, LEVEL_COUNT, levelId, localDate, type DailyDifficulty } from '@/utils/sudoku';
 
 export default function SudokuScreen() {
   const theme = useTheme();
   const { sessions, unlocked } = useGames();
   const [today, setToday] = useState(localDate);
+  const [difficulty, setDifficulty] = useState<DailyDifficulty>('Easy');
   useFocusEffect(useCallback(() => { setToday(localDate()); }, []));
   useEffect(() => { const timer = setInterval(() => setToday(localDate()), 30000); return () => clearInterval(timer); }, []);
-  const id = dailyId(today);
+  const legacyId = dailyId(today);
+  const id = sessions[legacyId] && getPuzzle(legacyId)?.difficulty === difficulty ? legacyId : dailyId(today, difficulty);
   const daily = getPuzzle(id);
   const savedDaily = sessions[id];
   const completed = Object.entries(sessions).filter(([key, session]) => key.startsWith('level-') && session.completed).length;
@@ -37,7 +39,14 @@ export default function SudokuScreen() {
         </View>
         <MiniBoard compact />
       </View>
-      <ThemedText themeColor="textSecondary" type="small" style={{ fontWeight: '400' }}>The same puzzle for you and your friends. A new one at local midnight.</ThemedText>
+      <View accessibilityRole="radiogroup" accessibilityLabel="Daily puzzle difficulty" style={{ flexDirection: 'row', gap: 8 }}>
+        {DAILY_DIFFICULTIES.map(option => <Pressable key={option} onPress={() => setDifficulty(option)} accessibilityRole="radio"
+          accessibilityLabel={option} accessibilityState={{ checked: difficulty === option }} testID={`daily-${option.toLowerCase()}`}
+          style={({ pressed }) => ({ flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: difficulty === option ? theme.primary : theme.backgroundSelected, opacity: pressed ? 0.75 : 1 })}>
+          <ThemedText type="smallBold" style={{ color: difficulty === option ? theme.primaryText : theme.primary }}>{option}</ThemedText>
+        </Pressable>)}
+      </View>
+      <ThemedText themeColor="textSecondary" type="small" style={{ fontWeight: '400' }}>A new puzzle at each difficulty, every local midnight. Your progress is saved separately.</ThemedText>
       {savedDaily?.completed ? <ThemedText themeColor="primary" type="smallBold">Solved in {formatTime(savedDaily.elapsed)}. See you tomorrow.</ThemedText> : null}
       <GameButton label={savedDaily?.completed ? 'View completed puzzle' : savedDaily ? 'Continue daily puzzle  →' : 'Play today’s puzzle  →'} onPress={() => router.push({ pathname: '/sudoku/[id]', params: { id } })} />
     </View>
