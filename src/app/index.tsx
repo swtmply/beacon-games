@@ -1,98 +1,36 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { router } from 'expo-router';
+import { View } from 'react-native';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
+import { GameButton, GamePage, Headline, MiniBoard, SaveNotice } from '@/components/game-ui';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { LEVEL_COUNT } from '@/utils/sudoku';
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
-  return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
+export default function CatalogScreen() {
+  const theme = useTheme();
+  return <GamePage>
+    <View style={{ paddingTop: 12, paddingBottom: 8 }}>
+      <Headline>{'Find your\nnext move.'}</Headline>
+    </View>
+    <SaveNotice />
+    <View style={{ borderRadius: 28, borderCurve: 'continuous', borderWidth: 1, borderColor: theme.border, backgroundColor: theme.backgroundElement, overflow: 'hidden' }}>
+      <View style={{ backgroundColor: theme.backgroundSelected, minHeight: 220, padding: 24, gap: 16, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ gap: 8, flex: 1, minWidth: 140 }}>
+          <ThemedText type="smallBold" themeColor="accent" style={{ letterSpacing: 2 }}>01 / LOGIC</ThemedText>
+          <ThemedText style={{ fontSize: 42, lineHeight: 50, fontWeight: '600', letterSpacing: -1 }}>Sudoku</ThemedText>
+          <ThemedText themeColor="textSecondary" type="small">Every square counts.</ThemedText>
+        </View>
+        <MiniBoard />
+      </View>
+      <View style={{ padding: 24, gap: 16 }}>
+        <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
+          {['Daily puzzles', `${LEVEL_COUNT} adventure levels`].map(label => <ThemedText key={label} type="small" themeColor="textSecondary">{label}</ThemedText>)}
+        </View>
+        <GameButton label="Play Sudoku  →" onPress={() => router.push('/sudoku')} />
+      </View>
+    </View>
+    <View style={{ alignItems: 'center', gap: 6, paddingVertical: 16 }}>
+      <ThemedText type="small" themeColor="textSecondary">Play offline · Progress saved on this device</ThemedText>
+    </View>
+  </GamePage>;
 }
-
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
-});
