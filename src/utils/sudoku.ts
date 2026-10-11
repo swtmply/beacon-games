@@ -22,6 +22,13 @@ export function arePeers(a: number, b: number) {
     (Math.floor(a / 27) === Math.floor(b / 27) && Math.floor(a % 9 / 3) === Math.floor(b % 9 / 3));
 }
 
+export function clearNotesForEntry(notes: number[][], index: number, digit: number) {
+  return notes.map((cell, peer) => {
+    if (peer === index) return cell.length ? [] : cell;
+    return arePeers(index, peer) && cell.includes(digit) ? cell.filter(value => value !== digit) : cell;
+  });
+}
+
 export function candidates(values: number[], index: number) {
   return DIGITS.filter(digit => !values.some((value, peer) => peer !== index && value === digit && arePeers(index, peer)));
 }

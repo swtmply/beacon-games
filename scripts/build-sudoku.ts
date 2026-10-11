@@ -1,6 +1,8 @@
 // bun scripts/build-sudoku.ts validates the pack; add --generate to rebuild it.
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 import pack from '../src/data/sudoku.json';
 import { candidates, dailyId, DIGITS, getPuzzle, seededRandom, shuffle } from '../src/utils/sudoku';
@@ -83,6 +85,9 @@ if (process.argv.includes('--generate')) {
   assert(ranked.length >= 24, 'Need 24 distinct difficulty scores');
   levels = Array.from({ length: 24 }, (_, i) => ranked[Math.round(i * (ranked.length - 1) / 23)]);
   writeFileSync(new URL('../src/data/sudoku.json', import.meta.url), JSON.stringify(levels, null, 2) + '\n');
+  // Reload the pack and getPuzzle together so validation uses the newly written data.
+  execFileSync(process.execPath, [fileURLToPath(import.meta.url)], { stdio: 'inherit' });
+  process.exit(0);
 }
 for (const [i, entry] of levels.entries()) {
   const board = [...entry.givens].map(Number);

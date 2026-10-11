@@ -13,6 +13,7 @@ export type Session = {
 };
 type Sessions = Record<string, Session>;
 const STORAGE_KEY = 'beacon:sudoku:v1';
+const RECOVERY_KEY = 'beacon:sudoku:recovery';
 
 export function newSession(puzzle: Puzzle): Session {
   return { values: [...puzzle.givens], notes: Array.from({ length: 81 }, () => []), elapsed: 0, mistakes: 0, hints: 0, completed: false };
@@ -36,17 +37,19 @@ function isSession(value: unknown, puzzle: Puzzle): value is Session {
     (!value.completed || values.every((digit, index) => digit === puzzle.solution[index]));
 }
 
-function parseSessions(raw: string | null): Sessions {
-  if (!raw) return {};
-  const data: unknown = JSON.parse(raw);
-  if (!isObject(data)) throw new Error('Saved progress could not be read.');
+function parseSessions(raw: string | null) {
   const sessions: Sessions = {};
+  if (raw === null) return { sessions, valid: true };
+  let data: unknown;
+  try { data = JSON.parse(raw); } catch { return { sessions, valid: false }; }
+  if (!isObject(data)) return { sessions, valid: false };
+  let valid = true;
   for (const [id, value] of Object.entries(data)) {
     const puzzle = getPuzzle(id);
-    if (!puzzle || !isSession(value, puzzle)) throw new Error('Saved progress could not be read.');
-    sessions[id] = value;
+    if (puzzle && isSession(value, puzzle)) sessions[id] = value;
+    else valid = false;
   }
-  return sessions;
+  return { sessions, valid };
 }
 
 function unlockedLevel(sessions: Sessions) {
@@ -59,31 +62,71 @@ const SessionsContext = createContext<Sessions | null>(null);
 const GamesContext = createContext<{
   ready: boolean;
   error: string | null;
+  busy: boolean;
+  canRecover: boolean;
   unlocked: number;
   save: (id: string, session: Session) => void;
   retry: () => void;
+  recover: () => void;
 } | null>(null);
 
 export function GamesProvider({ children }: PropsWithChildren) {
   const [sessions, setSessions] = useState<Sessions>({});
   const [ready, setReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [recovery, setRecovery] = useState<{ raw: string; sessions: Sessions } | null>(null);
+  const loading = useRef(false);
   const latest = useRef<Sessions>({});
   const queue = useRef(Promise.resolve());
 
-  const load = useCallback(() => {
-    void AsyncStorage.getItem(STORAGE_KEY).then(raw => {
+  const load = useCallback(async () => {
+    if (loading.current) return;
+    loading.current = true;
+    setBusy(true);
+    setRecovery(null);
+    try {
+      const raw = await AsyncStorage.getItem(STORAGE_KEY);
       const saved = parseSessions(raw);
-      latest.current = saved;
-      setSessions(saved);
+      if (!saved.valid && raw !== null) {
+        setRecovery({ raw, sessions: saved.sessions });
+        setError('Some saved progress is damaged. Recovery keeps readable games and backs up the original data on this device before replacing it. Unreadable games will start over.');
+        return;
+      }
+      latest.current = saved.sessions;
+      setSessions(saved.sessions);
       setError(null);
       setReady(true);
-    }).catch(() => {
+    } catch {
       setError('We could not read your progress. Retry to keep your saved games safe.');
-    });
+    } finally {
+      loading.current = false;
+      setBusy(false);
+    }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  const recover = useCallback(async () => {
+    if (!recovery || loading.current) return;
+    loading.current = true;
+    setBusy(true);
+    try {
+      // Preserve the full original before replacing any damaged progress.
+      await AsyncStorage.setItem(RECOVERY_KEY, recovery.raw);
+      await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(recovery.sessions));
+      latest.current = recovery.sessions;
+      setSessions(recovery.sessions);
+      setRecovery(null);
+      setError(null);
+      setReady(true);
+    } catch {
+      setError('Recovery could not finish. Your original data has not been discarded. Free some space, then try recovery again.');
+    } finally {
+      loading.current = false;
+      setBusy(false);
+    }
+  }, [recovery]);
+
+  useEffect(() => { void Promise.resolve().then(load); }, [load]);
 
   const persist = useCallback((snapshot: Sessions) => {
     // Serialize writes so quick taps cannot overwrite newer progress with an older save.
@@ -107,7 +150,8 @@ export function GamesProvider({ children }: PropsWithChildren) {
   const retry = useCallback(() => { if (ready) persist(latest.current); else void load(); }, [ready, persist, load]);
   const unlocked = unlockedLevel(sessions);
   // Progress changes should not refresh navigation or save notices.
-  const status = useMemo(() => ({ ready, error, unlocked, save, retry }), [ready, error, unlocked, save, retry]);
+  const canRecover = recovery !== null;
+  const status = useMemo(() => ({ ready, error, busy, canRecover, unlocked, save, retry, recover }), [ready, error, busy, canRecover, unlocked, save, retry, recover]);
 
   return <GamesContext value={status}><SessionsContext value={sessions}>{children}</SessionsContext></GamesContext>;
 }

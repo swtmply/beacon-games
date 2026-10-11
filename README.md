@@ -6,6 +6,10 @@ Puzzles and solutions ship with the app. The daily puzzle uses the device's cale
 
 Progress, pencil notes, time, hints, and completed levels are saved locally with AsyncStorage. Buttons and sheets use native `@expo/ui` components; the Sudoku grid uses React Native pressable cells. There are no accounts or online services.
 
+The interface follows the device appearance, with navy surfaces and electric-blue controls in dark mode and a matching light palette. Selected cells, related rows and boxes, matching numbers, and puzzle progress provide visual feedback during play.
+
+If saved data is damaged, startup offers recovery. Recovery backs up the original at `beacon:sudoku:recovery` before restoring readable sessions; unreadable sessions start over.
+
 ## Run locally
 
 ```sh

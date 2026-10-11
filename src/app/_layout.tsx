@@ -14,9 +14,13 @@ import { useTheme } from '@/hooks/use-theme';
 
 function Navigation() {
   const theme = useTheme();
-  const { ready, error, retry } = useGamesStatus();
+  const { ready, error, retry, recover, canRecover, busy } = useGamesStatus();
   if (!ready) return <View style={{ flex: 1, justifyContent: 'center', padding: 32, gap: 16, backgroundColor: theme.background }}>
-    {error ? <><ThemedText accessibilityRole="alert">{error}</ThemedText><GameButton label="Retry" onPress={retry} /></> : <ActivityIndicator color={theme.primary} accessibilityLabel="Loading your saved games" />}
+    {error ? <>
+      <ThemedText accessibilityRole="alert">{error}</ThemedText>
+      {canRecover ? <GameButton label={busy ? 'Recovering…' : 'Recover saved progress'} onPress={() => { void recover(); }} disabled={busy} /> : null}
+      <GameButton label={busy && !canRecover ? 'Loading…' : 'Retry'} onPress={retry} disabled={busy} secondary={canRecover} />
+    </> : <ActivityIndicator color={theme.primary} accessibilityLabel="Loading your saved games" />}
   </View>;
   return <>
     <StatusBar style="auto" />
